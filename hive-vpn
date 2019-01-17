@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+#Install and configure SoftetherVPN server
+
+user=$1
+psw=$2
+
+[[ -z $user || -z $psw ]] && echo "Usage: hive-vpn <vpn-login> <vpn-password>" && exit
+
+#install package
+dpkg -s software-properties-common > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+	apt-get update
+	DEBIAN_FRONTEND=noninteractive apt-get --yes --force-yes -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+	DEBIAN_FRONTEND=noninteractive apt-get --yes --force-yes -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install software-properties-common
+fi
+
+dpkg -s softether-vpnserver > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+	apt-add-repository -y ppa:paskal-07/softethervpn
+	apt-get update
+	apt-get -y install softether-vpnserver
+fi
+
+
+
+#Start service
+systemctl --quiet is-active softether-vpnserver.service
+if [[ $? -ne 0 ]]; then
+	systemctl enable softether-vpnserver.service
+	systemctl start softether-vpnserver.service
+fi
+
+#Configure server
+tap_addr="10.100.100.1"
+hub_addr="10.100.100.2"
+lease_begin="10.100.100.3"
+lease_end="10.100.100.6"
+
+vpncmd /SERVER localhost /CMD HubDelete DEFAULT > /dev/null 2>&1
+vpncmd /SERVER localhost /CMD HubCreate hive /PASSWORD > /dev/null 2>&1
+vpncmd /SERVER localhost /CMD IPsecEnable /L2TP:yes /L2TPRAW:yes /ETHERIP:yes /PSK:hive /DEFAULTHUB:hive > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD LogDisable packet > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD UserCreate $user /GROUP:none /REALNAME:none /NOTE:none > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD UserPasswordSet $user /PASSWORD:$psw > /dev/null 2>&1
+vpncmd /SERVER localhost /CMD BridgeCreate hive /DEVICE:hive /TAP:yes > /dev/null 2>&1
+
+#Configure and up virtual interface
+echo "[Match]" > /hive-config/network/tap.network
+echo "Name=tap*" >> /hive-config/network/tap.network
+echo "[Network]" >> /hive-config/network/tap.network
+echo "DHCP=no" >> /hive-config/network/tap.network
+echo "Address="$tap_addr"/29" >> /hive-config/network/tap.network
+
+if_wait=0
+while [[ $if_wait -eq 0 ]]
+do
+	if_wait=$(ifconfig -a | grep tap_hive | wc -l)
+	[[ $if_wait -eq 0 ]] && sleep 1 
+done
+
+ifconfig tap_hive $tap_addr/29 up
+
+
+vpncmd /SERVER localhost /HUB:hive /CMD SecureNatEnable > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD NatDisable > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD SecureNatHostSet /MAC /MASK:255.255.255.248 /IP:$hub_addr > /dev/null 2>&1
+vpncmd /SERVER localhost /HUB:hive /CMD DhcpSet /START:$lease_begin /END:$lease_end /MASK:255.255.255.248 /EXPIRE:7200 /GW:none /DNS:none /DNS2:none /DOMAIN:none /LOG:no > /dev/null 2>&1
+vpncmd /SERVER localhost /CMD VpnAzureSetEnable yes > /dev/null 2>&1
+vpn_ddns=`vpncmd /CSV /SERVER localhost /CMD DynamicDnsGetStatus | grep Full | awk -F , '{print $2}'`
+vpn_azure=`vpncmd /CSV /SERVER localhost /CMD VpnAzureGetStatus | grep Hostname | awk -F , '{print $2}'`
+
+
+[[ -z $vpn_azure ]] && vpn_azure="Azure disable"
+echo "******************"
+echo "VPN Client for various OS: https://www.softether-download.com/en.aspx?product=softether"
+echo
+echo "Information for connect:"
+echo "Host Name: "$vpn_azure
+echo "Port number: 443"
+echo "Virtual Hub Name: hive"
+echo "After establishing a VPN-connection,"
+echo "you can connect to your Riga via ssh using IP: "$tap_addr
+echo
+echo "******************"
+
