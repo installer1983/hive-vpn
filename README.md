@@ -1,6 +1,6 @@
 # hive-vpn
 
-Скрипт для автоматической установки и настройки VPN-серверк SoftEtherVPN
+Скрипт для автоматической установки и настройки VPN-сервера SoftEtherVPN
 ```
 cd /hive/sbin
 wget https://raw.githubusercontent.com/lexandr0s/hive-vpn/master/hive-vpn
@@ -11,7 +11,7 @@ chmod +x hive-vpn
 ```
 hive-vpn <username for vpn> <password for vpn>
 ```
-После завершения работы скрипт выведет необходимую информацию.
+После завершения работы скрипт выведет необходимую информацию для создания подключения.
 В вебинтерфейсе в меню удаленных подключений, добавится локальный интерфейс 10.100.100.1.
 
 Для подключения необходимо скачать клиента под нужную ОС: https://www.softether-download.com/en.aspx?product=softether
