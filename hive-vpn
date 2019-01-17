@@ -72,14 +72,18 @@ vpn_azure=`vpncmd /CSV /SERVER localhost /CMD VpnAzureGetStatus | grep Hostname 
 
 [[ -z $vpn_azure ]] && vpn_azure="Azure disable"
 echo "******************"
-echo "VPN Client for various OS: https://www.softether-download.com/en.aspx?product=softether"
+echo "VPN Client for various OS:"
+echo "https://www.softether-download.com/en.aspx?product=softether"
 echo
 echo "Information for connect:"
 echo "Host Name: "$vpn_azure
 echo "Port number: 443"
 echo "Virtual Hub Name: hive"
+echo "Auth type: Standart Password Autentification"
+echo "User Name: "$user
+echo "Password: "$psw
+echo
 echo "After establishing a VPN-connection,"
-echo "you can connect to your Riga via ssh using IP: "$tap_addr
+echo "you can connect to your Rig via ssh using IP: "$tap_addr
 echo
 echo "******************"
-
